@@ -30,7 +30,8 @@ setup(name='pymars',
       entry_points = {
         'console_scripts': ['pymars-podie=pymars.podie:main',
                             'pymars-plotRES=pymars.plotRES:main',
-                            'pymars-plotROC=pymars.plotROC:main']
+                            'pymars-plotROC=pymars.plotROC:main',
+                            'pymars-plotCRABRES=pymars.plotCRABRES:main']
       },
       include_package_data=True,
       dependencies=[],
