@@ -28,7 +28,7 @@
 #   podie - Python odie-like program to generate the theta2 plot automatically from
 #           MARS melibea (under development) and CTLearn files.
 #
-#   For help: $ python podie.py -h
+#   For help: $ pymars-podie -h
 #
 #######################################################################################
 
@@ -67,7 +67,7 @@ def main():
                         help='maximum hadronness values (overwrites default value of eRange argument)',
                         default=None,
                         type=float)
-    parser.add_argument('--sizeCut',
+    parser.add_argument('--sizeCut', '-z',
                         help='minimum size values (automatically set if eRange provided)',
                         default=[300.0, 300.0],
                         nargs='+',

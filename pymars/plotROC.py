@@ -78,10 +78,11 @@ def main():
 
     # color cycle of matplotlib
     color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    
-    for i, file in enumerate(files):
+    color_counter = 0    
+    for file in files:
         if file.split('.')[-1] == "h5":
-
+            color_counter += 1
+            color_counter %= len(color_cycle)
             data = pd.HDFStore(file, 'r')
             linestyle = {'proton': 'dashed', 'off': 'solid'}
             for bkg in ['proton', 'off']:
@@ -97,7 +98,7 @@ def main():
                 
                 fpr, tpr, thresholds = metrics.roc_curve(mc_particle, reco_gammaness)
                 
-                ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="{} (vs {}), AUC={:0.3f}".format(file.split('/')[-1], bkg, metrics.auc(fpr, tpr)), color=color_cycle[i], linestyle=linestyle[bkg], linewidth=1.5)
+                ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="{} (vs {}), AUC={:0.3f}".format(file.split('/')[-1], bkg, metrics.auc(fpr, tpr)), color=color_cycle[color_counter], linestyle=linestyle[bkg], linewidth=1.5)
 
         elif file.split('.')[-1] == "root":
             melibea_file = uproot.open(file)
