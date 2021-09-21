@@ -119,51 +119,6 @@ def main():
                     leakage1_m1 = parameters[0][-2]
                     leakage1_m2 = parameters[1][-2]
 
-                    if args.sizeCut:
-                        #TODO: Make generic for any given number of telescopes
-                        sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
-                        mc_energy = mc_energy[sizeMask]
-                        reco_energy = reco_energy[sizeMask]
-                        mc_alt = mc_alt[sizeMask]
-                        reco_alt = reco_alt[sizeMask]
-                        mc_az = mc_az[sizeMask]
-                        reco_az = reco_az[sizeMask]
-                        hadronness = hadronness[sizeMask]
-                        leakage1_m1 = leakage1_m1[sizeMask]
-                        leakage1_m2 = leakage1_m2[sizeMask]
-
-                    if args.leakage1Cut:
-                        #TODO: Make generic for any given number of telescopes
-                        leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
-                        mc_energy = mc_energy[leakage1Mask]
-                        reco_energy = reco_energy[leakage1Mask]
-                        mc_alt = mc_alt[leakage1Mask]
-                        reco_alt = reco_alt[leakage1Mask]
-                        mc_az = mc_az[leakage1Mask]
-                        reco_az = reco_az[leakage1Mask]
-                        hadronness = hadronness[leakage1Mask]
-
-                    if args.signalCut:
-                        theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
-                        theta2Mask = (theta2.value < args.signalCut)
-                        mc_energy = mc_energy[theta2Mask]
-                        reco_energy = reco_energy[theta2Mask]
-                        mc_alt = mc_alt[theta2Mask]
-                        reco_alt = reco_alt[theta2Mask]
-                        mc_az = mc_az[theta2Mask]
-                        reco_az = reco_az[theta2Mask]
-                        hadronness = hadronness[theta2Mask]
-
-                    if args.hadronnessCut:
-                        hadronnessMask = (hadronness < args.hadronnessCut)
-                        mc_energy = mc_energy[hadronnessMask]
-                        reco_energy = reco_energy[hadronnessMask]
-                        mc_alt = mc_alt[hadronnessMask]
-                        reco_alt = reco_alt[hadronnessMask]
-                        mc_az = mc_az[hadronnessMask]
-                        reco_az = reco_az[hadronnessMask]
-
-                    print(len(reco_energy))
             elif file.split('.')[-1] == "root":
                 melibea_file = uproot.open(file)
                 evts = melibea_file["Events"]
@@ -192,49 +147,49 @@ def main():
                     leakage1_m1 = np.asarray(evts["MNewImagePar_1.fLeakage1"].array())[marsDefaultMask]
                     leakage1_m2 = np.asarray(evts["MNewImagePar_2.fLeakage1"].array())[marsDefaultMask]
 
-                    if args.sizeCut:
-                        sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
-                        mc_energy = mc_energy[sizeMask]
-                        reco_energy = reco_energy[sizeMask]
-                        mc_alt = mc_alt[sizeMask]
-                        reco_alt = reco_alt[sizeMask]
-                        mc_az = mc_az[sizeMask]
-                        reco_az = reco_az[sizeMask]
-                        hadronness = hadronness[sizeMask]
-                        leakage1_m1 = leakage1_m1[sizeMask]
-                        leakage1_m2 = leakage1_m2[sizeMask]
+            if args.sizeCut:
+                sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
+                mc_energy = mc_energy[sizeMask]
+                reco_energy = reco_energy[sizeMask]
+                mc_alt = mc_alt[sizeMask]
+                reco_alt = reco_alt[sizeMask]
+                mc_az = mc_az[sizeMask]
+                reco_az = reco_az[sizeMask]
+                hadronness = hadronness[sizeMask]
+                leakage1_m1 = leakage1_m1[sizeMask]
+                leakage1_m2 = leakage1_m2[sizeMask]
 
-                    if args.leakage1Cut:
-                        leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
-                        mc_energy = mc_energy[leakage1Mask]
-                        reco_energy = reco_energy[leakage1Mask]
-                        mc_alt = mc_alt[leakage1Mask]
-                        reco_alt = reco_alt[leakage1Mask]
-                        mc_az = mc_az[leakage1Mask]
-                        reco_az = reco_az[leakage1Mask]
-                        hadronness = hadronness[leakage1Mask]
+            if args.leakage1Cut:
+                leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
+                mc_energy = mc_energy[leakage1Mask]
+                reco_energy = reco_energy[leakage1Mask]
+                mc_alt = mc_alt[leakage1Mask]
+                reco_alt = reco_alt[leakage1Mask]
+                mc_az = mc_az[leakage1Mask]
+                reco_az = reco_az[leakage1Mask]
+                hadronness = hadronness[leakage1Mask]
 
-                    if args.signalCut:
-                        theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
-                        theta2Mask = (theta2.value < args.signalCut)
-                        mc_energy = mc_energy[theta2Mask]
-                        reco_energy = reco_energy[theta2Mask]
-                        mc_alt = mc_alt[theta2Mask]
-                        reco_alt = reco_alt[theta2Mask]
-                        mc_az = mc_az[theta2Mask]
-                        reco_az = reco_az[theta2Mask]
-                        hadronness = hadronness[theta2Mask]
+            if args.signalCut:
+                theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
+                theta2Mask = (theta2.value < args.signalCut)
+                mc_energy = mc_energy[theta2Mask]
+                reco_energy = reco_energy[theta2Mask]
+                mc_alt = mc_alt[theta2Mask]
+                reco_alt = reco_alt[theta2Mask]
+                mc_az = mc_az[theta2Mask]
+                reco_az = reco_az[theta2Mask]
+                hadronness = hadronness[theta2Mask]
 
-                    if args.hadronnessCut:
-                        hadronnessMask = (hadronness < args.hadronnessCut)
-                        mc_energy = mc_energy[hadronnessMask]
-                        reco_energy = reco_energy[hadronnessMask]
-                        mc_alt = mc_alt[hadronnessMask]
-                        reco_alt = reco_alt[hadronnessMask]
-                        mc_az = mc_az[hadronnessMask]
-                        reco_az = reco_az[hadronnessMask]
+            if args.hadronnessCut:
+                hadronnessMask = (hadronness < args.hadronnessCut)
+                mc_energy = mc_energy[hadronnessMask]
+                reco_energy = reco_energy[hadronnessMask]
+                mc_alt = mc_alt[hadronnessMask]
+                reco_alt = reco_alt[hadronnessMask]
+                mc_az = mc_az[hadronnessMask]
+                reco_az = reco_az[hadronnessMask]
 
-                    print(len(reco_energy))
+            print(len(reco_energy))
 
             ax = ctaplot.plot_energy_resolution(mc_energy.to(u.TeV).value, reco_energy.to(u.TeV).value, label=f"{file.split('/')[-1]}")            
 
@@ -277,9 +232,9 @@ def main():
                 reco_alt = np.array(data['gamma']['reco_altitude']) * u.rad
                 mc_az = np.array(data['gamma']['mc_azimuth']) * u.rad
                 reco_az = np.array(data['gamma']['reco_azimuth']) * u.rad
-                #if args.signalCut or args.hadronnessCut or args.sizeCut or args.leakage1Cut:
-                print(len(reco_energy))
 
+                print(len(reco_energy))
+                #if args.signalCut or args.hadronnessCut or args.sizeCut or args.leakage1Cut:
                 if args.hadronnessCut or args.sizeCut or args.leakage1Cut:
                     parameters = np.dstack(data['gamma']["parameters"].to_numpy())
                     hadronness = 1 - data['gamma']["reco_gammaness"].to_numpy()
@@ -288,49 +243,6 @@ def main():
                     size_m2 = parameters[1][0]
                     leakage1_m1 = parameters[0][-2]
                     leakage1_m2 = parameters[1][-2]
-
-                    if args.sizeCut:
-                        #TODO: Make generic for any given number of telescopes
-                        sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
-                        reco_energy = reco_energy[sizeMask]
-                        mc_alt = mc_alt[sizeMask]
-                        reco_alt = reco_alt[sizeMask]
-                        mc_az = mc_az[sizeMask]
-                        reco_az = reco_az[sizeMask]
-                        hadronness = hadronness[sizeMask]
-                        leakage1_m1 = leakage1_m1[sizeMask]
-                        leakage1_m2 = leakage1_m2[sizeMask]
-
-                    if args.leakage1Cut:
-                        #TODO: Make generic for any given number of telescopes
-                        leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
-                        reco_energy = reco_energy[leakage1Mask]
-                        mc_alt = mc_alt[leakage1Mask]
-                        reco_alt = reco_alt[leakage1Mask]
-                        mc_az = mc_az[leakage1Mask]
-                        reco_az = reco_az[leakage1Mask]
-                        hadronness = hadronness[leakage1Mask]
-
-                    #if args.signalCut:
-                    #    theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
-                    #    theta2Mask = (theta2.value < args.signalCut)
-                    #    mc_energy = mc_energy[theta2Mask]
-                    #    reco_energy = reco_energy[theta2Mask]
-                    #    mc_alt = mc_alt[theta2Mask]
-                    #    reco_alt = reco_alt[theta2Mask]
-                    #    mc_az = mc_az[theta2Mask]
-                    #    reco_az = reco_az[theta2Mask]
-                    #    hadronness = hadronness[theta2Mask]
-
-                    if args.hadronnessCut:
-                        hadronnessMask = (hadronness < args.hadronnessCut)
-                        reco_energy = reco_energy[hadronnessMask]
-                        mc_alt = mc_alt[hadronnessMask]
-                        reco_alt = reco_alt[hadronnessMask]
-                        mc_az = mc_az[hadronnessMask]
-                        reco_az = reco_az[hadronnessMask]
-
-                    print(len(reco_energy))
 
             elif file.split('.')[-1] == "root":
                 melibea_file = uproot.open(file)
@@ -346,7 +258,6 @@ def main():
 
                 print(len(reco_energy))
                 #if args.signalCut or args.hadronnessCut or args.sizeCut or args.leakage1Cut:
-
                 if args.hadronnessCut or args.sizeCut or args.leakage1Cut:
                     reco_energy = reco_energy[marsDefaultMask]
                     mc_alt = mc_alt[marsDefaultMask]
@@ -359,44 +270,44 @@ def main():
                     leakage1_m1 = np.asarray(evts["MNewImagePar_1.fLeakage1"].array())[marsDefaultMask]
                     leakage1_m2 = np.asarray(evts["MNewImagePar_2.fLeakage1"].array())[marsDefaultMask]
 
-                    if args.sizeCut:
-                        sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
-                        reco_energy = reco_energy[sizeMask]
-                        mc_alt = mc_alt[sizeMask]
-                        reco_alt = reco_alt[sizeMask]
-                        mc_az = mc_az[sizeMask]
-                        reco_az = reco_az[sizeMask]
-                        hadronness = hadronness[sizeMask]
-                        leakage1_m1 = leakage1_m1[sizeMask]
-                        leakage1_m2 = leakage1_m2[sizeMask]
+            if args.sizeCut:
+                sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
+                reco_energy = reco_energy[sizeMask]
+                mc_alt = mc_alt[sizeMask]
+                reco_alt = reco_alt[sizeMask]
+                mc_az = mc_az[sizeMask]
+                reco_az = reco_az[sizeMask]
+                hadronness = hadronness[sizeMask]
+                leakage1_m1 = leakage1_m1[sizeMask]
+                leakage1_m2 = leakage1_m2[sizeMask]
 
-                    if args.leakage1Cut:
-                        leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
-                        reco_energy = reco_energy[leakage1Mask]
-                        mc_alt = mc_alt[leakage1Mask]
-                        reco_alt = reco_alt[leakage1Mask]
-                        mc_az = mc_az[leakage1Mask]
-                        reco_az = reco_az[leakage1Mask]
-                        hadronness = hadronness[leakage1Mask]
+            if args.leakage1Cut:
+                leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
+                reco_energy = reco_energy[leakage1Mask]
+                mc_alt = mc_alt[leakage1Mask]
+                reco_alt = reco_alt[leakage1Mask]
+                mc_az = mc_az[leakage1Mask]
+                reco_az = reco_az[leakage1Mask]
+                hadronness = hadronness[leakage1Mask]
 
-                    #if args.signalCut:
-                    #    theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
-                    #    theta2Mask = (theta2.value < args.signalCut)
-                    #    reco_energy = reco_energy[theta2Mask]
-                    #    mc_alt = mc_alt[theta2Mask]
-                    #    reco_alt = reco_alt[theta2Mask]
-                    #    mc_az = mc_az[theta2Mask]
-                    #    reco_az = reco_az[theta2Mask]
-                    #    hadronness = hadronness[theta2Mask]
+            #if args.signalCut:
+            #    theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
+            #    theta2Mask = (theta2.value < args.signalCut)
+            #    reco_energy = reco_energy[theta2Mask]
+            #    mc_alt = mc_alt[theta2Mask]
+            #    reco_alt = reco_alt[theta2Mask]
+            #    mc_az = mc_az[theta2Mask]
+            #    reco_az = reco_az[theta2Mask]
+            #    hadronness = hadronness[theta2Mask]
 
-                    if args.hadronnessCut:
-                        hadronnessMask = (hadronness < args.hadronnessCut)
-                        reco_energy = reco_energy[hadronnessMask]
-                        mc_alt = mc_alt[hadronnessMask]
-                        reco_alt = reco_alt[hadronnessMask]
-                        mc_az = mc_az[hadronnessMask]
-                        reco_az = reco_az[hadronnessMask]
-                    print(len(reco_energy))
+            if args.hadronnessCut:
+                hadronnessMask = (hadronness < args.hadronnessCut)
+                reco_energy = reco_energy[hadronnessMask]
+                mc_alt = mc_alt[hadronnessMask]
+                reco_alt = reco_alt[hadronnessMask]
+                mc_az = mc_az[hadronnessMask]
+                reco_az = reco_az[hadronnessMask]
+            print(len(reco_energy))
 
             ax = ctaplot.plot_angular_resolution_per_energy(reco_alt.to(u.rad).value, reco_az.to(u.rad).value, mc_alt.to(u.rad).value, mc_az.to(u.rad).value, reco_energy.to(u.TeV).value, bias_correction=False, label=f"{file.split('/')[-1]}")
             
