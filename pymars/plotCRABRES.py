@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #/* ================================================================================ *\
 #!
@@ -52,13 +51,15 @@ def main():
                         default="./")
     parser.add_argument('--pattern', '-p',
                         help='pattern to mask unwanted files for the data input directory',
-                        default="*")
+                        default=["*"],
+                        nargs='+')
     parser.add_argument('--input_mc', '-m',
                         help='input directory',
                         default=None)
     parser.add_argument('--pattern_mc', '-q',
                         help='pattern to mask unwanted files for the MCs input directory',
-                        default="*")
+                        default=["*"],
+                        nargs='+')
     parser.add_argument('--output_dir', '-o',
                         help='path where to save generated files. By default, the current directory is used.',
                         default="./")
@@ -90,36 +91,138 @@ def main():
 
     # Input handling
     abs_file_dir = os.path.abspath(args.input_data)
-    filelists = [glob.glob(os.path.join(abs_file_dir, args.pattern))]
+    filelists = []
+    labels = []
+    for pattern in args.pattern:
+        files = glob.glob(os.path.join(abs_file_dir, pattern))
+        if not files: continue
+        filelists.append(files)
+        if files[0].split('.')[-1] == "h5":
+            labels.append(f"Crab 2.93h ({files[0].split('/')[-1].split('_')[1]} images)")
+        elif files[0].split('.')[-1] == "root":
+            labels.append(f"MARS - Crab 2.93h")
+
     if args.input_mc:
         abs_file_dir_mc = os.path.abspath(args.input_mc)
-        filelists.append(glob.glob(os.path.join(abs_file_dir_mc, args.pattern_mc)))
-        
+        for pattern in args.pattern_mc:
+            files = glob.glob(os.path.join(abs_file_dir, pattern))
+            if not files: continue
+            filelists.append(files)
+            if files[0].split('.')[-1] == "h5":
+                labels.append(f"MC ST0310 ({files[0].split('/')[-1].split('_')[1]} images)")
+            elif files[0].split('.')[-1] == "root":
+                labels.append(f"MARS - MC ST0310")
+    print(labels)
+
     fig, ax = plt.subplots(1,figsize=(17,9))
     for f, files in enumerate(filelists):
-        image_type = files[0].split("/")[-1].split("_")[1]
-        label = f"Crab 2.93h ({image_type} images)" if f == 0 else f"MC ST0310 ({image_type} images)"
-        for i, file in enumerate(files):
-            print(file)
-            data = pd.HDFStore(file, 'r')
-            observations = data.keys() if f == 0 else ['gamma']
-            for j, obs in enumerate(observations):
-                reco_energy = np.array(data[obs]['reco_energy']) * u.TeV
-                mc_alt = np.array(data[obs]['mc_altitude']) * u.rad
-                reco_alt = np.array(data[obs]['reco_altitude']) * u.rad
-                mc_az = np.array(data[obs]['mc_azimuth']) * u.rad
-                reco_az = np.array(data[obs]['reco_azimuth']) * u.rad
+        if files[0].split('.')[-1] == "h5":
+            for i, file in enumerate(files):
+                print(file)
+                data = pd.HDFStore(file, 'r')
+                observations = data.keys() if  "Crab" in labels[f] else ['gamma']
+                for j, obs in enumerate(observations):
+                    reco_energy = np.array(data[obs]['reco_energy']) * u.TeV
+                    mc_alt = np.array(data[obs]['mc_altitude']) * u.rad
+                    reco_alt = np.array(data[obs]['reco_altitude']) * u.rad
+                    mc_az = np.array(data[obs]['mc_azimuth']) * u.rad
+                    reco_az = np.array(data[obs]['reco_azimuth']) * u.rad
+
+                    print(len(reco_energy))
+
+                    if args.signalCut or args.hadronnessCut or args.sizeCut or args.leakage1Cut:
+                        parameters = np.dstack(data[obs]["parameters"].to_numpy())
+                        hadronness = 1 - data[obs]["reco_gammaness"].to_numpy()
+                        #TODO: Make generic for any given number of telescopes
+                        size_m1 = parameters[0][0]
+                        size_m2 = parameters[1][0]
+                        leakage1_m1 = parameters[0][-2]
+                        leakage1_m2 = parameters[1][-2]
+
+                        if args.sizeCut:
+                            #TODO: Make generic for any given number of telescopes
+                            sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
+                            reco_energy = reco_energy[sizeMask]
+                            mc_alt = mc_alt[sizeMask]
+                            reco_alt = reco_alt[sizeMask]
+                            mc_az = mc_az[sizeMask]
+                            reco_az = reco_az[sizeMask]
+                            hadronness = hadronness[sizeMask]
+                            leakage1_m1 = leakage1_m1[sizeMask]
+                            leakage1_m2 = leakage1_m2[sizeMask]
+
+                        if args.leakage1Cut:
+                            #TODO: Make generic for any given number of telescopes
+                            leakage1Mask = (leakage1_m1 < args.leakage1Cut[0]) & (leakage1_m2 < args.leakage1Cut[1])
+                            reco_energy = reco_energy[leakage1Mask]
+                            mc_alt = mc_alt[leakage1Mask]
+                            reco_alt = reco_alt[leakage1Mask]
+                            mc_az = mc_az[leakage1Mask]
+                            reco_az = reco_az[leakage1Mask]
+                            hadronness = hadronness[leakage1Mask]
+
+                        if args.signalCut:
+                            theta2 = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
+                            theta2Mask = (theta2.value < args.signalCut)
+                            reco_energy = reco_energy[theta2Mask]
+                            mc_alt = mc_alt[theta2Mask]
+                            reco_alt = reco_alt[theta2Mask]
+                            mc_az = mc_az[theta2Mask]
+                            reco_az = reco_az[theta2Mask]
+                            hadronness = hadronness[theta2Mask]
+
+                        if args.hadronnessCut:
+                            hadronnessMask = (hadronness < args.hadronnessCut)
+                            reco_energy = reco_energy[hadronnessMask]
+                            mc_alt = mc_alt[hadronnessMask]
+                            reco_alt = reco_alt[hadronnessMask]
+                            mc_az = mc_az[hadronnessMask]
+                            reco_az = reco_az[hadronnessMask]
+
+                    print(len(reco_energy))
+
+                    if i == 0 and j == 0:
+                        total_mc_alt = mc_alt
+                        total_reco_alt = reco_alt
+                        total_mc_az = mc_az
+                        total_reco_az = reco_az
+                        total_reco_energy = reco_energy
+                    else:
+                        total_mc_alt = np.concatenate((total_mc_alt, mc_alt))
+                        total_reco_alt = np.concatenate((total_reco_alt, reco_alt))
+                        total_mc_az = np.concatenate((total_mc_az, mc_az))
+                        total_reco_az = np.concatenate((total_reco_az, reco_az))
+                        total_reco_energy = np.concatenate((total_reco_energy, reco_energy))
+
+                print(len(total_reco_energy))
+
+        elif files[0].split('.')[-1] == "root":
+            for i, file in enumerate(files):
+                print(file)
+                melibea_file = uproot.open(file)
+                evts = melibea_file["Events"]
+                reco_alt = np.asarray(evts["MStereoParDisp.fDirectionY"].array()) +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())
+                reco_az = np.asarray(evts["MStereoParDisp.fDirectionX"].array()) +  np.asarray(evts["MPointingPos_1.fAz"].array())
+                marsDefaultMask = ~np.isnan(reco_alt)
+                reco_alt *= u.deg
+                reco_az *= u.deg
+                mc_alt =  (np.asarray(evts["MSrcPosCam_1.fY"].array()) * 0.00337 +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())) * u.deg
+                mc_az =  (np.asarray(evts["MSrcPosCam_1.fX"].array()) * 0.00337 +  np.asarray(evts["MPointingPos_1.fAz"].array())) * u.deg
+                reco_energy = np.asarray(evts["MEnergyEst.fEnergy"].array()) * u.GeV
 
                 print(len(reco_energy))
 
                 if args.signalCut or args.hadronnessCut or args.sizeCut or args.leakage1Cut:
-                    parameters = np.dstack(data[obs]["parameters"].to_numpy())
-                    hadronness = 1 - data[obs]["reco_gammaness"].to_numpy()
-                    #TODO: Make generic for any given number of telescopes
-                    size_m1 = parameters[0][0]
-                    size_m2 = parameters[1][0]
-                    leakage1_m1 = parameters[0][-2]
-                    leakage1_m2 = parameters[1][-2]
+                    reco_energy = reco_energy[marsDefaultMask]
+                    mc_alt = mc_alt[marsDefaultMask]
+                    reco_alt = reco_alt[marsDefaultMask]
+                    mc_az = mc_az[marsDefaultMask]
+                    reco_az = reco_az[marsDefaultMask]
+                    hadronness = np.asarray(evts["MHadronness.fHadronness"].array())[marsDefaultMask]
+                    size_m1 = np.asarray(evts["MHillas_1.fSize"].array())[marsDefaultMask]
+                    size_m2 = np.asarray(evts["MHillas_2.fSize"].array())[marsDefaultMask]
+                    leakage1_m1 = np.asarray(evts["MNewImagePar_1.fLeakage1"].array())[marsDefaultMask]
+                    leakage1_m2 = np.asarray(evts["MNewImagePar_2.fLeakage1"].array())[marsDefaultMask]
 
                     if args.sizeCut:
                         #TODO: Make generic for any given number of telescopes
@@ -163,7 +266,7 @@ def main():
 
                 print(len(reco_energy))
 
-                if i == 0 and j == 0:
+                if i == 0:
                     total_mc_alt = mc_alt
                     total_reco_alt = reco_alt
                     total_mc_az = mc_az
@@ -176,9 +279,7 @@ def main():
                     total_reco_az = np.concatenate((total_reco_az, reco_az))
                     total_reco_energy = np.concatenate((total_reco_energy, reco_energy))
 
-            print(len(total_reco_energy))
-
-        ax = ctaplot.plot_angular_resolution_per_energy(total_reco_alt.to(u.rad).value, total_reco_az.to(u.rad).value, total_mc_alt.to(u.rad).value, total_mc_az.to(u.rad).value, total_reco_energy.to(u.TeV).value, bias_correction=False, label=f"{label}")
+        ax = ctaplot.plot_angular_resolution_per_energy(total_reco_alt.to(u.rad).value, total_reco_az.to(u.rad).value, total_mc_alt.to(u.rad).value, total_mc_az.to(u.rad).value, total_reco_energy.to(u.TeV).value, bias_correction=False, label=f"{labels[f]}")
 
     if args.aleksic:
         # Aleksic et al. (2015) MAGIC performance (angular)
