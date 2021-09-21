@@ -2,7 +2,7 @@
 pyMARS
 ======
 
-pyMARS is a python-based package under active development for IACT event analysis of the MAGIC telescopes. The purpose of this repo is to quickly and easily visualize and process the output of `CTLearn <https://github.com/ctlearn-project/ctlearn>`_ using data from the MAGIC telescopes. Currently under construction is the support for MARS melibea files to directly compare DL2 and DL3 data. It is also planned to add an interface to `pyIRF <https://github.com/cta-observatory/pyirf>`_ and `gammaPy <https://gammapy.org/>`_ at least for the CTLearn chain (MARS anaylsis should be converted via the DL3 converter). 
+pyMARS is a python-based package under active development for IACT event analysis of the MAGIC telescopes. The purpose of this repo is to quickly and easily visualize and process the output of `CTLearn <https://github.com/ctlearn-project/ctlearn>`_ using data from the MAGIC telescopes. pyMARS also supports MARS melibea files to directly compare DL2 and DL3 data. It is also planned to add an interface to `pyIRF <https://github.com/cta-observatory/pyirf>`_ and `gammaPy <https://gammapy.org/>`_ at least for the CTLearn chain (MARS anaylsis should be converted via the DL3 converter). 
 
 ----
 
