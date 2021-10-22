@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #/* ================================================================================ *\
 #!
@@ -73,11 +72,13 @@ def main():
         off_files = glob.glob(os.path.join(abs_file_dir_off, args.pattern_offdata))
 
 
-    plt.figure(figsize=(12,12))
-    ax = plt.axes()
+    fig, ax = plt.subplots(1,figsize=(12,12))
 
     # color cycle of matplotlib
     color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    color_cycle = ["orange", "royalblue"]
+    naming = ["CTLearn - cleaned images", "CTLearn - raw images"]
+
     color_counter = 0    
     for file in files:
         if file.split('.')[-1] == "h5":
@@ -91,14 +92,15 @@ def main():
 
                 gamma_mc_particle = np.array(data['gamma']['mc_particle']).astype(int)
                 gamma_reco_gammaness = np.array(data['gamma']['reco_gammaness']).astype(float)
-                
+                 
                 # Concatenate the background with the gammas (ringwobble)
                 mc_particle = np.concatenate((bkg_mc_particle, gamma_mc_particle))
                 reco_gammaness = np.concatenate((bkg_reco_gammaness, gamma_reco_gammaness))
                 
                 fpr, tpr, thresholds = metrics.roc_curve(mc_particle, reco_gammaness)
-                
-                ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="{} (vs {}), AUC={:0.3f}".format(file.split('/')[-1], bkg, metrics.auc(fpr, tpr)), color=color_cycle[color_counter], linestyle=linestyle[bkg], linewidth=1.5)
+                particle_type = "MCs proton" if bkg == 'proton' else "off data"
+                ax.plot(fpr, tpr, label="{} (vs {}), AUC={:0.3f}".format(naming[color_counter], particle_type, metrics.auc(fpr, tpr)), color=color_cycle[color_counter], linestyle=linestyle[bkg], linewidth=1.5)
+                #ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="{} (vs {}), AUC={:0.3f}".format(naming[color_counter], particle_type, metrics.auc(fpr, tpr)), color=color_cycle[color_counter], linestyle=linestyle[bkg], linewidth=1.5)
 
         elif file.split('.')[-1] == "root":
             melibea_file = uproot.open(file)
@@ -123,8 +125,8 @@ def main():
             reco_gammaness = np.concatenate((bkg_reco_gammaness, gamma_reco_gammaness_root))
 
             fpr, tpr, thresholds = metrics.roc_curve(mc_particle, reco_gammaness)
-
-            ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="ST0310-MARS (vs MCs proton), AUC={:0.3f}".format(metrics.auc(fpr, tpr)), color='black', linestyle="dashed", linewidth=1.5)
+            ax.plot(fpr, tpr, label="MARS - standard RF (vs MCs proton), AUC={:0.3f}".format(metrics.auc(fpr, tpr)), color='black', linestyle="dashed", linewidth=1.5)
+            #ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="MARS - standard RF (vs MCs proton), AUC={:0.3f}".format(metrics.auc(fpr, tpr)), color='black', linestyle="dashed", linewidth=1.5)
 
     if args.input_offdata:
         bkg_mc_particle = []
@@ -145,26 +147,29 @@ def main():
         reco_gammaness = np.concatenate((bkg_reco_gammaness, gamma_reco_gammaness_root))
 
         fpr, tpr, thresholds = metrics.roc_curve(mc_particle, reco_gammaness)
+        ax.plot(fpr, tpr, label="MARS - standard RF (vs off data), AUC={:0.3f}".format(metrics.auc(fpr, tpr)), color='black', linestyle="solid", linewidth=1.5)
+        #ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="MARS - standard RF (vs off data), AUC={:0.3f}".format(metrics.auc(fpr, tpr)), color='black', linestyle="solid", linewidth=1.5)
 
-        ax = ctaplot.plot_roc_curve(mc_particle, reco_gammaness, label="ST0310-MARS (vs off data), AUC={:0.3f}".format(metrics.auc(fpr, tpr)), color='black', linestyle="solid", linewidth=1.5)
+    ax.set_xlabel('False positive rate', fontsize=34)
+    ax.set_xbound(0.0,1.0)
+    ax.set_xticks([0.0,1.0])
 
-    ax.set_xlabel('False positive rate', fontsize=25)
-    plt.xlim(0.0,1.0)
-    ax.set_xticks([0.0,0.2,0.4,0.6,0.8,1.0])
+    ax.set_ylabel('True positive rate', fontsize=34)
+    ax.set_ybound(0.0,1.0)
+    ax.set_yticks([0.0,1.0])
 
-    ax.set_ylabel('True positive rate', fontsize=25)
-    plt.ylim(0.0,1.0)
-    ax.set_yticks([0.0,0.2,0.4,0.6,0.8,1.0])
-
-    ax.plot([0, 1], [0, 1], '--', color='black')
+    ax.plot([0, 1], [0, 1], '--', color='grey')
     #major grid lines
-    ax.tick_params(labelsize=25)
-    plt.grid(b=True, which='major', color='gray', alpha=0.3, linestyle='dashdot', lw=1.5)
+    ax.tick_params(labelsize=30)
+    #plt.grid(b=True, which='major', color='gray', alpha=0.3, linestyle='dashdot', lw=1.5)
 
-    ax.legend(loc='lower right',fontsize=20)
-    ax.set_title("ROC curves",fontsize=30)
+    ax.text(0.5, 0.5, 'Preliminary', fontsize=58, alpha=0.5, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
+    ax.legend(loc='lower right',fontsize=22)
+    ax.set_title("ROC curves",fontsize=40)
+    plt.tight_layout()
     
-    plt.savefig(f"{args.output_dir}/roc_curves.png")
+    plt.savefig(f"{args.output_dir}/roc_curves.pdf", dpi=600)
 
 if __name__ == "__main__":
     main()

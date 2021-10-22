@@ -94,10 +94,12 @@ def main():
     # Input handling
     abs_file_dir = os.path.abspath(args.input_dir)
     files = glob.glob(os.path.join(abs_file_dir, args.pattern))
-    
+    naming = ["MARS - standard LUTs", "CTLearn - raw images", "CTLearn - cleaned images"]    
+    colors = ["black", "royalblue", "orange"]
+
     if args.energy:
-        fig, ax = plt.subplots(1,figsize=(17,9))
-        for file in files:
+        fig, ax = plt.subplots(1,figsize=(12,12))
+        for i, file in enumerate(files):
             print(file)
             if file.split('.')[-1] == "h5":
                 data = pd.HDFStore(file, 'r')
@@ -191,7 +193,7 @@ def main():
 
             print(len(reco_energy))
 
-            ax = ctaplot.plot_energy_resolution(mc_energy.to(u.TeV).value, reco_energy.to(u.TeV).value, label=f"{file.split('/')[-1]}")            
+            ax = ctaplot.plot_energy_resolution(mc_energy.to(u.TeV).value, reco_energy.to(u.TeV).value, label=naming[i], color=colors[i])            
 
         if args.aleksic:
             # Aleksic et al. (2015) MAGIC performance (energy)
@@ -200,30 +202,33 @@ def main():
             ax.plot(aleksic_energy, aleksic_resolution, label="Aleksic et al. (2015)")
 
         # Scale, labels and title
-        ax.set_ylabel(r"$(\Delta E/E)_{68}$",fontsize=25)
+        ax.set_ylabel(r"$(\Delta E/E)_{68}$",fontsize=34)
 
         ax.set_ybound(0.08,0.33)
-        ax.set_yticks([0.1,0.15,0.2,0.25,0.3])
+        ax.set_yticks([0.1,0.2,0.3])
 
-        ax.set_xlabel("Energy [TeV]",fontsize=25)
+        ax.set_xlabel("Simulated energy [TeV]",fontsize=34)
         ax.set_xscale('log')
         ax.set_xbound(4e-2,25)
-        ax.set_title('Energy resolution',fontsize=30)
+        ax.set_title('Energy resolution',fontsize=40)
 
-        ax.tick_params(labelsize=25)
+        ax.text(0.5, 0.5, 'Preliminary', fontsize=58, alpha=0.5, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
+        ax.tick_params(labelsize=28)
+        plt.tight_layout()
 
         #major and minor grid lines
         plt.grid(b=True, which='major', color='gray', alpha=0.3, linestyle='dashdot', lw=1.5)
         plt.minorticks_on()
         plt.grid(b=True, which='minor', color='beige', alpha=0.5, ls='-', lw=1)
-        ax.legend(loc='upper right',fontsize=25)
+        ax.legend(loc='upper right',fontsize=28)
 
-        plt.savefig(f"{args.output_dir}/energyresolution.png")
+        plt.savefig(f"{args.output_dir}/energyresolution.pdf", dpi=600)
     
     if args.angular:
-        fig, ax = plt.subplots(1,figsize=(17,9))
+        fig, ax = plt.subplots(1,figsize=(12,12))
     
-        for file in files:
+        for i, file in enumerate(files):
             print(file)
             if file.split('.')[-1] == "h5":
                 data = pd.HDFStore(file, 'r')
@@ -309,7 +314,7 @@ def main():
                 reco_az = reco_az[hadronnessMask]
             print(len(reco_energy))
 
-            ax = ctaplot.plot_angular_resolution_per_energy(reco_alt.to(u.rad).value, reco_az.to(u.rad).value, mc_alt.to(u.rad).value, mc_az.to(u.rad).value, reco_energy.to(u.TeV).value, bias_correction=False, label=f"{file.split('/')[-1]}")
+            ax = ctaplot.plot_angular_resolution_per_energy(reco_alt.to(u.rad).value, reco_az.to(u.rad).value, mc_alt.to(u.rad).value, mc_az.to(u.rad).value, reco_energy.to(u.TeV).value, bias_correction=False, label=naming[i], color=colors[i])
             
         if args.aleksic:
             # Aleksic et al. (2015) MAGIC performance (angular)
@@ -319,25 +324,29 @@ def main():
 
 
         # Scale, labels and title
-        ax.set_ylabel(r'$\theta [deg]$',fontsize=25)
+        ax.set_ylabel(r'$\theta_{68} [deg]$',fontsize=34)
 
         ax.set_ybound(0.03,0.22)
         ax.set_yticks([0.05,0.1,0.15,0.2])
 
-        ax.set_xlabel("E_reco [TeV]",fontsize=25)
+        ax.set_xlabel("Reconstructed energy [TeV]",fontsize=34)
         ax.set_xscale('log')
         ax.set_xbound(4e-2,25)
-        ax.set_title('Angular resolution',fontsize=30)
+        ax.set_title('Angular resolution',fontsize=40)
 
-        ax.tick_params(labelsize=25)
+        ax.text(0.5, 0.5, 'Preliminary', fontsize=58, alpha=0.5, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
+        ax.tick_params(labelsize=28)
+        plt.tight_layout()
 
         #major and minor grid lines
         plt.grid(b=True, which='major', color='gray', alpha=0.3, linestyle='dashdot', lw=1.5)
         plt.minorticks_on()
         plt.grid(b=True, which='minor', color='beige', alpha=0.5, ls='-', lw=1)
-        ax.legend(loc='upper right',fontsize=25)
+        ax.legend(loc='upper right',fontsize=28)
+        plt.tight_layout()
 
-        plt.savefig(f"{args.output_dir}/angularresolution.png")
+        plt.savefig(f"{args.output_dir}/angularresolution.pdf", dpi=600)
 
 if __name__ == "__main__":
     main()

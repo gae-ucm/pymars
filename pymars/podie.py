@@ -39,6 +39,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from astropy import units as u
+from astropy.time import Time
 
 def main():
 
@@ -93,8 +94,25 @@ def main():
                         help='number of bins in signal region; default "2"',
                         default=2,
                         type=int)
-
+    parser.add_argument('--times', '-t',
+                        help='quate excluded time file; ascii format ".times"')
     args = parser.parse_args()
+
+
+    # Handling the time slices from Quate to excluded unwanted data
+    if args.times:
+        quate_file = args.times if os.path.isfile(args.times) else args.times.replace(".times","_1.times")
+        quate_times = open(quate_file).readlines()
+        excluded_time_start, excluded_time_stop = [], []
+        for time in quate_times:
+            day = time.split()[0].split(".")
+            hms = time.split()[1]
+            excluded_time_start.append(f"{day[2]}-{day[1]}-{day[0]}T{hms}")
+            day = time.split()[2].split(".")
+            hms = time.split()[3].replace("\n", "")
+            excluded_time_stop.append(f"{day[2]}-{day[1]}-{day[0]}T{hms}")
+        excluded_time_start = Time(excluded_time_start, format='isot', scale='utc').mjd
+        excluded_time_stop = Time(excluded_time_stop, format='isot', scale='utc').mjd
 
     # Input handling
     abs_file_dir = os.path.abspath(args.input_dir)
@@ -146,121 +164,135 @@ def main():
     nWobbleOff2rotations = {1: [180], 3:[180, 90, 270]}
     offRegions = args.offRegions
     if args.nWobbleOff: offRegions = nWobbleOff2rotations[args.nWobbleOff]
+    n_off_per_offregion = np.zeros(len(offRegions))
     
     if filename_type == "h5":
-
-        off_managment = {}
         for i, file in enumerate(files):
+            print(file)
             data = pd.HDFStore(file, 'r')
             observations = data.keys()
             for j, obs in enumerate(observations):
-                off_managment[obs] = pd.DataFrame({})
-                
-                parameters = np.dstack(data[obs]["parameters"].to_numpy())
-                
-                #TODO: Make generic for any given number of telescopes
-                size_m1 = parameters[0][0]
-                size_m2 = parameters[1][0]
-                sizeMask = (size_m1 > eRange["sizeCut"][0]) & (size_m2 > eRange["sizeCut"][1])
-                
-                off_managment[obs] = pd.DataFrame({})
+                print(obs)
+                reco_energy = np.array(data[obs]['reco_energy']) * u.TeV
+                mc_alt = np.array(data[obs]['mc_altitude']) * u.rad
+                reco_alt = np.array(data[obs]['reco_altitude']) * u.rad
+                mc_az = np.array(data[obs]['mc_azimuth']) * u.rad
+                reco_az = np.array(data[obs]['reco_azimuth']) * u.rad
+                pointing_alt = np.array(data[obs]['pointing_alt']) * u.rad
+                pointing_az = np.array(data[obs]['pointing_az']) * u.rad
+                print(len(reco_energy))
 
+                parameters = np.dstack(data[obs]["parameters"].to_numpy())
                 hadronness = 1 - data[obs]["reco_gammaness"].to_numpy()
 
-                hadronness_mask = (hadronness[sizeMask] < eRange["hadronnessCut"])
-                reco_energy = data[obs]["reco_energy"].to_numpy()
-                energyMask = (reco_energy[sizeMask][hadronness_mask] > eRange["energyCut"])
-                # ON regions
-                theta2_on = ((data[obs]["mc_altitude"]-data[obs]["reco_altitude"]).to_numpy() * u.rad).to(u.deg)**2 + ((data[obs]["mc_azimuth"]-data[obs]["reco_azimuth"]).to_numpy() * u.rad).to(u.deg)**2
-                theta2_on_hadronness = theta2_on[sizeMask][hadronness_mask][energyMask]
+                hadronnessMask = (hadronness < eRange["hadronnessCut"])
+                reco_energy = reco_energy[hadronnessMask]
+                mc_alt = mc_alt[hadronnessMask]
+                reco_alt = reco_alt[hadronnessMask]
+                mc_az = mc_az[hadronnessMask]
+                reco_az = reco_az[hadronnessMask]
+                pointing_alt = pointing_alt[hadronnessMask]
+                pointing_az = pointing_az[hadronnessMask]
+
+                if eRange["sizeCut"][0] > 0.0 and eRange["sizeCut"][1] > 0.0:
+                    #TODO: Make generic for any given number of telescopes
+                    size_m1 = parameters[0][0][hadronnessMask]
+                    size_m2 = parameters[1][0][hadronnessMask]
+                    sizeMask = (size_m1 > eRange["sizeCut"][0]) & (size_m2 > eRange["sizeCut"][1])
+                    reco_energy = reco_energy[sizeMask]
+                    mc_alt = mc_alt[sizeMask]
+                    reco_alt = reco_alt[sizeMask]
+                    mc_az = mc_az[sizeMask]
+                    reco_az = reco_az[sizeMask]
+                    pointing_alt = pointing_alt[sizeMask]
+                    pointing_az = pointing_az[sizeMask]
+
+                if eRange["energyCut"] > 0.0:
+                    energyMask = (reco_energy > eRange["energyCut"])
+                    reco_energy = reco_energy[energyMask]
+                    mc_alt = mc_alt[energyMask]
+                    reco_alt = reco_alt[energyMask]
+                    mc_az = mc_az[energyMask]
+                    reco_az = reco_az[energyMask]
+                    pointing_alt = pointing_alt[energyMask]
+                    pointing_az = pointing_az[energyMask]
+
+                print(len(reco_energy))
+
+                # ON region
+                theta2_on = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
                 if i == 0 and j == 0:
-                    total_on_hadronness = theta2_on_hadronness.value
+                    total_theta2_on = theta2_on.value
                 else:
-                    total_on_hadronness = np.concatenate((total_on_hadronness, theta2_on_hadronness.value))
+                    total_theta2_on = np.concatenate((total_theta2_on, theta2_on.value))
 
                 # OFF regions
-                delta_alt = (data[obs]["mc_altitude"]-data[obs]["pointing_alt"]).to_numpy()
-                delta_az = (data[obs]["mc_azimuth"]-data[obs]["pointing_az"]).to_numpy()
-                delta = np.vstack((delta_alt, delta_az))
-                for rotation in offRegions:
+                delta = np.vstack((mc_alt-pointing_alt, mc_az-pointing_az))
+                for r, rotation in enumerate(offRegions):
                     rotation = float(rotation) * u.deg
                     rotation_matrix = np.matrix([[np.cos(rotation.to(u.rad)), -np.sin(rotation.to(u.rad))],
-                                             [np.sin(rotation.to(u.rad)), np.cos(rotation.to(u.rad))]], dtype=float)
+                                                [np.sin(rotation.to(u.rad)), np.cos(rotation.to(u.rad))]], dtype=float)
                     off = np.squeeze(np.asarray(np.dot(rotation_matrix, delta)))
-                    off_managment[obs][f"off_alt_{rotation.value}"] = off[:][0]
-                    off_managment[obs][f"off_az_{rotation.value}"] = off[:][1]
-                    off_managment[obs][f"off_alt_{rotation.value}_pointing"] = off_managment[obs][f"off_alt_{rotation.value}"] + data[obs]["pointing_alt"]
-                    off_managment[obs][f"off_az_{rotation.value}_pointing"] = off_managment[obs][f"off_az_{rotation.value}"] + data[obs]["pointing_az"]
-
+                    off_alt = off[:][0] * u.rad + pointing_alt
+                    off_az = off[:][1] * u.rad + pointing_az
+                    theta2_off = (off_alt-reco_alt).to(u.deg)**2 + (off_az-reco_az).to(u.deg)**2
+                    n_off_per_offregion[r] += len(theta2_off[theta2_off.value < eRange["signalCut"]])
+                    if i == 0 and j == 0 and r == 0:
+                        total_theta2_off = theta2_off.value
+                    else:
+                        total_theta2_off = np.concatenate((total_theta2_off, theta2_off.value))
                 
         # Create the theta2 plot
-        fig, ax = plt.subplots(figsize =(10, 7))
+        fig, ax = plt.subplots(figsize =(12, 9))
 
-        # Plot the histogram for the On region
-        ax.hist(total_on_hadronness, bins=hist_bin, range=(0.0, args.rangeTh2), color= "black", alpha=1.0, histtype='step', label='On')
+        # Plot the histogram for the ON and OFF region
+        ax.hist(total_theta2_on, bins=hist_bin, range=(0.0, args.rangeTh2), color= "black", alpha=1.0, histtype='step', label='On region')
+        ax.hist(total_theta2_off, bins=hist_bin, range=(0.0, args.rangeTh2), weights=np.ones(len(total_theta2_off))/float(len(offRegions)), alpha=0.8, label='Off regions', color="grey")
 
-        # Plot the histogram for the Off regions
-        n_off = 0
-        for rotation in offRegions:
-            rotation = float(rotation)
-            for i, file in enumerate(files):
-                data = pd.HDFStore(file, 'r')
-                observations = data.keys()
-                for j, obs in enumerate(observations):
-                   
-                    parameters =  np.dstack(data[obs]["parameters"].to_numpy())
-                    #TODO: Make generic for any given number of telescopes
-                    size_m1 = parameters[0][0]
-                    size_m2 = parameters[1][0]
-                    sizeMask = (size_m1 > eRange["sizeCut"][0]) & (size_m2 > eRange["sizeCut"][1])
-                    hadronness = 1 - data[obs]["reco_gammaness"].to_numpy()
-                    hadronness_mask = (hadronness[sizeMask] < eRange["hadronnessCut"])
-                    
-                    reco_energy = data[obs]["reco_energy"].to_numpy()
-                    energyMask = (reco_energy[sizeMask][hadronness_mask] > eRange["energyCut"])
-                    theta2_off = ((off_managment[obs][f"off_alt_{rotation}_pointing"]-data[obs]["reco_altitude"]).to_numpy() * u.rad).to(u.deg)**2 + ((off_managment[obs][f"off_az_{rotation}_pointing"]-data[obs]["reco_azimuth"]).to_numpy() * u.rad).to(u.deg)**2
-                    theta2_off_hadronness = theta2_off[sizeMask][hadronness_mask][energyMask]
-
-                    if i == 0 and j == 0:
-                        total_off_hadronness = theta2_off_hadronness.value
-                    else:
-                        total_off_hadronness = np.concatenate((total_off_hadronness, theta2_off_hadronness.value))
-                    
-            ax.hist(total_off_hadronness, bins=hist_bin, range=(0.0, args.rangeTh2), alpha=0.5, histtype='step', label=f'Off_{int(rotation)}')
-            n_off += len(total_off_hadronness[total_off_hadronness < eRange["signalCut"]])
-            
-        n_on = float(len(total_on_hadronness[total_on_hadronness < eRange["signalCut"]]))
-        n_off = float(n_off)
-        n_signal = n_on + n_off
+        n_on = float(len(total_theta2_on[total_theta2_on < eRange["signalCut"]]))
+        total_n_off = np.sum(n_off_per_offregion)
+        n_off = np.sum(n_off_per_offregion)/float(len(offRegions))
+        n_off_error = np.std(n_off_per_offregion)
+        n_excess = n_on - n_off
+        n_excess_error = np.sqrt(n_on + n_off_error*n_off_error)
+        n_signal = n_on + total_n_off
         alpha = 1.0/float(len(offRegions))
         log_on = np.log( (n_on*(alpha + 1)) / (n_signal*alpha))
-        log_off = np.log( (n_off*(alpha + 1)) / n_signal)
-        sig = np.sqrt((n_on*log_on + n_off*log_off) * 2)
+        log_off = np.log( (total_n_off*(alpha + 1)) / n_signal)
+        sig = np.sqrt((n_on*log_on + total_n_off*log_off) * 2)
+        pSigma50 = n_excess / np.sqrt(n_off) * np.sqrt(50.0/2.93)
+        sens = 5./ pSigma50 *100.0
+        sens_error = sens * (np.sqrt((1.0/2.0/n_off+1.0/n_excess)*n_off_error*(1.0/2.0/n_off+1.0/n_excess)*n_off_error + n_on/n_excess/n_excess))
+        gamma_rate = n_excess/(2.93*60)
+        gamma_rate_error = n_excess_error/(2.93*60)
+        bkg_rate = n_off/(2.93*60)
+        bkg_rate_error = n_off_error/(2.93*60)
 
-        gamma_rate = (n_on - n_off/float(len(offRegions)))/(2.93*60)
-        bkg_rate = (n_off/float(len(offRegions)))/(2.93*60)
-
-        ax.text(0.8, 0.9, f'Time = 2.93 h', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-        ax.text(0.8, 0.85, f'N_on = {int(n_on)}; N_off = {int(n_off/float(len(offRegions)))}', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-        ax.text(0.8, 0.8, f'Significance (Li&Ma) = {sig:.1f}$ \sigma $', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-        ax.text(0.8, 0.75, f'Gamma Rate = {gamma_rate:.2f} / min', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-        ax.text(0.8, 0.7, f'Bkg Rate = {bkg_rate:.3f} / min', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.88, f'Source = Crab Nebula', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.84, f'Time = 2.93 h', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.8, f'N_on = {int(n_on)}; N_off = {n_off:.1f}\u00B1{n_off_error:.1f} ', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.76, f'N_ex = {n_excess:.1f}\u00B1{n_excess_error:.1f} ', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.72, f'Significance (Li&Ma) = {sig:.1f}$ \sigma$', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.68, f'Sensitivity = {sens:.2f}\u00B1{sens_error:.2f} % Crab', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.64, f'Gamma Rate = {gamma_rate:.2f}\u00B1{gamma_rate_error:.2f} / min', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.8, 0.6, f'Bkg Rate = {bkg_rate:.3f}\u00B1{bkg_rate_error:.3f} / min', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
 
         ax.set_xbound(0.0, args.rangeTh2)
         ax.axvline(x=eRange["signalCut"], linestyle="dashed", color="red")
-        ax.legend(loc='upper center',fontsize=17)
+        ax.legend(loc='upper center',fontsize=20)
 
         ax.text(0.5, 0.5, 'Preliminary', fontsize=58, alpha=0.5, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
 
-        ax.set_title(f"{args.name}",fontsize=25)
-        ax.set_xlabel(r'$\theta^{2} [deg^{2}]$', fontsize=25)
-        ax.set_ylabel(r'$N_{events}$', fontsize=25)
-        ax.tick_params(labelsize=20)
+        ax.set_title(f"CTLearn ME - cleaned images",fontsize=36)
+        ax.set_xlabel(r'$\theta^{2} [deg^{2}]$', fontsize=30)
+        ax.set_ylabel(r'$N_{events}$', fontsize=30)
+        ax.tick_params(labelsize=25)
 
+        plt.tight_layout()
         # Save plot
-        plt.savefig(f"{args.output_dir}/podie_{args.name}.png")
+        plt.savefig(f"{args.output_dir}/podie_{args.name}.pdf", dpi=600)
         # Show plot
-        plt.show()
+        #plt.show()
 
 if __name__ == "__main__":
     main()
