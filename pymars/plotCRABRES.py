@@ -261,15 +261,16 @@ def main():
                 melibea_file = uproot.open(file)
                 evts = melibea_file["Events"]
                 reco_alt = np.asarray(evts["MStereoParDisp.fDirectionY"].array()) +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())
-                reco_az = np.asarray(evts["MStereoParDisp.fDirectionX"].array()) +  np.asarray(evts["MPointingPos_1.fAz"].array())
                 marsDefaultMask = ~np.isnan(reco_alt)
+                reco_alt = reco_alt[marsDefaultMask]
+                reco_az = np.asarray(evts["MStereoParDisp.fDirectionX"].array()) +  np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask]
                 reco_alt *= u.deg
                 reco_az *= u.deg
-                mc_alt =  (np.asarray(evts["MSrcPosCam_1.fY"].array()) * 0.00337 +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())) * u.deg
-                mc_az =  (np.asarray(evts["MSrcPosCam_1.fX"].array()) * 0.00337 +  np.asarray(evts["MPointingPos_1.fAz"].array())) * u.deg
-                pointing_alt = (90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())) * u.deg
-                pointing_az = np.asarray(evts["MPointingPos_1.fAz"].array()) * u.deg
-                reco_energy = np.asarray(evts["MEnergyEst.fEnergy"].array()) * u.GeV
+                mc_alt =  (np.asarray(evts["MSrcPosCam_1.fY"].array()) * 0.00337 +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array()))[marsDefaultMask] * u.deg
+                mc_az =  (np.asarray(evts["MSrcPosCam_1.fX"].array()) * 0.00337 +  np.asarray(evts["MPointingPos_1.fAz"].array()))[marsDefaultMask] * u.deg
+                pointing_alt = (90.0 - np.asarray(evts["MPointingPos_1.fZd"].array()))[marsDefaultMask] * u.deg
+                pointing_az = np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask] * u.deg
+                reco_energy = np.asarray(evts["MEnergyEst.fEnergy"].array())[marsDefaultMask] * u.GeV
 
 
                 print(len(reco_energy))
