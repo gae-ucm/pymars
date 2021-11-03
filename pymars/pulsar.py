@@ -248,17 +248,17 @@ def main():
         else:
             total_theta2_on = np.concatenate((total_theta2_on, theta2_on.value))
 
-    # Do this from MJD later!
-    #total_time = 2.93
+        # Do this from MJD later!
+        #total_time = 2.93
 
-    # Get the events in the ON region 
-    on_region = total_theta2_on < eRange["signalCut"]
+        # Get the events in the ON region 
+        on_region = total_theta2_on < eRange["signalCut"]
 
-    mjd = mjd[on_region]
-    millisec = millisec[on_region]
-    nanosec = nanosec[on_region]
+        mjd = mjd[on_region]
+        millisec = millisec[on_region]
+        nanosec = nanosec[on_region]
 
-    # From here you have the time_stamps of the events in the ON region:
+        # From here you have the time_stamps of the events in the ON region:
 
 
 
