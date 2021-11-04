@@ -76,14 +76,15 @@ def main():
                         default=[50.0, 50.0],
                         nargs='+',
                         type=float)
-    parser.add_argument('--energyCut', '-e',
+    parser.add_argument('--energyCut',
                         help='minimum reco energy values',
                         default=0.0,
                         type=float)
+    parser.add_argument('--ephemeris', '-e',
+                        help='ephemeris file; txt format')
     parser.add_argument('--times', '-t',
                         help='quate excluded time file; ascii format ".times"')
     args = parser.parse_args()
-
 
     # Handling the time slices from Quate to excluded unwanted data
     # TODO_TM: Implement the quate cuts
@@ -234,8 +235,8 @@ def main():
         #Read the ephemeris txt file
         colnames=['PSR', 'RAJ1','RAJ2','RAJ3', 'DECJ1','DECJ2','DECJ3', 'START', 'FINISH', 't0geo', 'F0', 'F1', 'F2',
               'RMS','Observatory', 'EPHEM', 'PSR2']
-        df_ephem = pd.read_csv(abs_file_dir+'/all.gro', delimiter='\s+',names=colnames,header=None)    
-        
+        df_ephem = pd.read_csv(os.path.abspath(args.ephemeris), delimiter='\s+',names=colnames,header=None)
+
         #Search the line of the ephemeris at which the interval time of arrivals given belongs
         for i in range(0,len(df_ephem['START'])):
                 if (timestamp[0]>df_ephem['START'][i]) & (timestamp[0]<df_ephem['FINISH'][i]):
