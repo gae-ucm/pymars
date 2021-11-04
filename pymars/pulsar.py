@@ -80,6 +80,10 @@ def main():
                         help='minimum reco energy values',
                         default=0.0,
                         type=float)
+    parser.add_argument('--nbins', '-b',
+                        help='number of bins to be used in the phaseogram',
+                        default=30,
+                        type=int)
     parser.add_argument('--ephemeris', '-e',
                         help='ephemeris file; txt format')
     parser.add_argument('--times', '-t',
@@ -349,7 +353,7 @@ def main():
 
 
     #Histogram of phases
-    lc = np.histogram(phases, np.linspace(0,1,21))    
+    lc = np.histogram(phases, np.linspace(0,1,args.nbins+1))
     pcentres=(lc[1][1:]+lc[1][:-1])/2
    
     # Create the pulsar phase plot
