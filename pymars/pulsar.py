@@ -63,24 +63,21 @@ def main():
     parser.add_argument('--name', '-n',
                         help='name or ID of the anaylsis',
                         default=None)
-    parser.add_argument('--eRange', '-e',
-                        help='target energy range; valid option are (FR, LE, HE)',
-                        default=None)
     parser.add_argument('--signalCut', '-s',
-                        help='maximum theta2 values for the signal region (overwrites default value of eRange argument)',
-                        default=None,
+                        help='maximum theta2 values for the signal region',
+                        default=0.03,
                         type=float)
     parser.add_argument('--hadronnessCut', '-k',
-                        help='maximum hadronness values (overwrites default value of eRange argument)',
-                        default=None,
+                        help='maximum hadronness values',
+                        default=0.5,
                         type=float)
     parser.add_argument('--sizeCut', '-z',
-                        help='minimum size values (automatically set if eRange provided)',
-                        default=[300.0, 300.0],
+                        help='minimum size values',
+                        default=[50.0, 50.0],
                         nargs='+',
                         type=float)
-    parser.add_argument('--energyCut',
-                        help='minimum reco energy values (automatically set if eRange provided)',
+    parser.add_argument('--energyCut', '-e',
+                        help='minimum reco energy values',
                         default=0.0,
                         type=float)
     parser.add_argument('--times', '-t',
@@ -109,44 +106,6 @@ def main():
     files = np.sort(glob.glob(os.path.join(abs_file_dir, args.pattern)))
     filename_type = files[0].split('.')[-1]
 
-    # MARS standard analysis
-    # For full range (FR) analysis
-    # Sensitivity ~ 0.7% Crab
-    # For low energy (LE) analysis
-    # Sensitivity ~ 1.2% Crab
-    # For high energy (HE) analysis
-    # Sensitivity ~ 1.% Crab
-    eRanges = {
-        "FR": {
-            "signalCut": 0.009,
-            "hadronnessCut": 0.16,
-            "sizeCut": [300.0, 300.0],
-            "energyCut": 0.0
-        },
-        "LE": {
-            "signalCut": 0.02,
-            "hadronnessCut": 0.28,
-            "sizeCut": [60.0, 60.0],
-            "energyCut": 0.0
-        },
-        "HE": {
-            "signalCut": 0.007,
-            "hadronnessCut": 0.1,
-            "sizeCut": [400.0, 400.0],
-            "energyCut": 1000.0
-        },
-    }
-    
-    # Parse the quality cuts for this analysis
-    eRange = {}
-    if args.eRange:
-        eRange = eRanges[args.eRange]
-    else:
-        eRange["sizeCut"] = args.sizeCut
-        eRange["energyCut"] = args.energyCut
-    if args.hadronnessCut: eRange["hadronnessCut"] = args.hadronnessCut
-    if args.signalCut: eRange["signalCut"] = args.signalCut
-    
     phases = np.array([])
     for i, file in enumerate(files):
         print(file)
@@ -195,7 +154,7 @@ def main():
             leakage1_m1 = np.asarray(evts["MNewImagePar_1.fLeakage1"].array())[marsDefaultMask]
             leakage1_m2 = np.asarray(evts["MNewImagePar_2.fLeakage1"].array())[marsDefaultMask]
 
-        hadronnessMask = (hadronness < eRange["hadronnessCut"])
+        hadronnessMask = (hadronness < args.hadronnessCut)
         reco_energy = reco_energy[hadronnessMask]
         mc_alt = mc_alt[hadronnessMask]
         reco_alt = reco_alt[hadronnessMask]
@@ -213,9 +172,9 @@ def main():
         leakage1_m1 = leakage1_m1[hadronnessMask]
         leakage1_m2 = leakage1_m2[hadronnessMask]
 
-        if eRange["sizeCut"][0] > 0.0 and eRange["sizeCut"][1] > 0.0:
+        if args.sizeCut[0] > 0.0 and args.sizeCut[1] > 0.0:
             #TODO: Make generic for any given number of telescopes
-            sizeMask = (size_m1 > eRange["sizeCut"][0]) & (size_m2 > eRange["sizeCut"][1])
+            sizeMask = (size_m1 > args.sizeCut[0]) & (size_m2 > args.sizeCut[1])
             reco_energy = reco_energy[sizeMask]
             mc_alt = mc_alt[sizeMask]
             reco_alt = reco_alt[sizeMask]
@@ -231,8 +190,8 @@ def main():
             leakage1_m1 = leakage1_m1[sizeMask]
             leakage1_m2 = leakage1_m2[sizeMask]
 
-        if eRange["energyCut"] > 0.0:
-            energyMask = (reco_energy > eRange["energyCut"])
+        if args.energyCut > 0.0:
+            energyMask = (reco_energy > args.energyCut)
             reco_energy = reco_energy[energyMask]
             mc_alt = mc_alt[energyMask]
             reco_alt = reco_alt[energyMask]
@@ -251,7 +210,7 @@ def main():
         #total_time = 2.93
 
         # Get the events in the ON region 
-        on_region = theta2_on.value < eRange["signalCut"]
+        on_region = theta2_on.value < args.signalCut
 
         mjd = mjd[on_region]
         millisec = millisec[on_region]
