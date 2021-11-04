@@ -42,8 +42,10 @@ import matplotlib.pyplot as plt
 from astropy import units as u
 from astropy.time import Time
 import uproot
+from pint import toa
+from pint import models
 import pint
-
+import csv
 
 def main():
 
@@ -104,7 +106,7 @@ def main():
 
     # Input handling
     abs_file_dir = os.path.abspath(args.input_dir)
-    files = glob.glob(os.path.join(abs_file_dir, args.pattern))
+    files = np.sort(glob.glob(os.path.join(abs_file_dir, args.pattern)))
     filename_type = files[0].split('.')[-1]
 
     # MARS standard analysis
@@ -145,7 +147,9 @@ def main():
     if args.hadronnessCut: eRange["hadronnessCut"] = args.hadronnessCut
     if args.signalCut: eRange["signalCut"] = args.signalCut
     
+    phases = np.array([])
     for i, file in enumerate(files):
+        print(file)
         if filename_type == "h5":
             data = pd.HDFStore(file, 'r')
             reco_energy = np.array(data['data']['reco_energy']) * u.TeV
@@ -184,7 +188,7 @@ def main():
             mjd = np.asarray(evts["MTime_1.fMjd"].array())[marsDefaultMask]
             millisec = np.asarray(evts["MTime_1.fTime.fMilliSec"].array())[marsDefaultMask]/1000.0/3600.0/24.0
             nanosec = np.asarray(evts["MTime_1.fNanoSec"].array())[marsDefaultMask]/1e9/3600.0/24.0
-
+            print(np.asarray(evts["MTime_1.fTime.fMilliSec"].array())[marsDefaultMask])
             hadronness = np.asarray(evts["MHadronness.fHadronness"].array())[marsDefaultMask]
             size_m1 = np.asarray(evts["MHillas_1.fSize"].array())[marsDefaultMask]
             size_m2 = np.asarray(evts["MHillas_2.fSize"].array())[marsDefaultMask]
@@ -243,34 +247,186 @@ def main():
 
         # ON region
         theta2_on = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
-        if i == 0:
-            total_theta2_on = theta2_on.value
-        else:
-            total_theta2_on = np.concatenate((total_theta2_on, theta2_on.value))
-
         # Do this from MJD later!
         #total_time = 2.93
 
         # Get the events in the ON region 
-        on_region = total_theta2_on < eRange["signalCut"]
+        on_region = theta2_on.value < eRange["signalCut"]
 
         mjd = mjd[on_region]
         millisec = millisec[on_region]
         nanosec = nanosec[on_region]
+        timestamp = np.float128(mjd+millisec+nanosec) 
+ 
+        # From here you have the time_stamps of the events in the ON region:        
+	
+	# Write the .tim file to use with PINT
+        timname='times.tim'
+        timFile=open(timname,'w+')
+        timFile.write('FORMAT 1 \n')
+        for i in range(0,len(timestamp)):
+                timFile.write('magic '+'0.0 '+str(timestamp[i])+' 0.0 '+ 'magic'+' \n')
+        timFile.close()
 
-        # From here you have the time_stamps of the events in the ON region:
+        #Upload the TOAs object
+        t= pint.toa.get_TOAs(timname)
+    
+        #Create model from ephemeris
+        #Read the ephemeris txt file
+        colnames=['PSR', 'RAJ1','RAJ2','RAJ3', 'DECJ1','DECJ2','DECJ3', 'START', 'FINISH', 't0geo', 'F0', 'F1', 'F2',
+              'RMS','Observatory', 'EPHEM', 'PSR2']
+        df_ephem = pd.read_csv(abs_file_dir+'/all.gro', delimiter='\s+',names=colnames,header=None)    
+        
+        #Search the line of the ephemeris at which the interval time of arrivals given belongs
+        for i in range(0,len(df_ephem['START'])):
+                if (timestamp[0]>df_ephem['START'][i]) & (timestamp[0]<df_ephem['FINISH'][i]):
+                        break		
+                elif (timestamp[0]< df_ephem['START'][i]) & (i==0):
+                        print('No ephemeris available')
+                elif (timestamp[0]> df_ephem['START'][i]) & (timestamp[0]> df_ephem['FINISH'][i])& (i==len(df_ephem['START'])):
+                        print('No ephemeris available')
+
+       
+
+        # Select the components(see PINT pulsar documentation)
+        components=[]
+        for name in ["AbsPhase","AstrometryEquatorial", "Spindown","SolarSystemShapiro"]:
+                component_object = models.timing_model.Component.component_types[name]  
+                components.append(component_object())
+
+        time_model = models.timing_model.TimingModel(components=components)
 
 
+        #Add second derivative of the frequency
+        f2 = models.parameter.prefixParameter(
+                parameter_type="float",
+                name="F2",
+                value=0.0,
+                units=u.Hz / (u.s) ** 2,
+                longdouble=True,
+        )	
+        time_model.components["Spindown"].add_param(f2, setup=True)
 
+
+        #Add START and FINISH parameters
+        time_model.add_param_from_top(models.parameter.MJDParameter(name="START", description="Start MJD for fitting"), "")
+        time_model.add_param_from_top(models.parameter.MJDParameter(name="FINISH", description="End MJD for fitting"), "")
+    
+	#Adopt format of f1 and f2 from PINT        
+        f1=float(str(df_ephem['F1'][i].replace('D','E')))
+        f2=float(str(df_ephem['F2'][i].replace('D','E')))
+    
+        #Create a dictionary with the values of the parameters
+        param_dic = {
+                "PSR":(df_ephem['PSR'][i]) ,
+                "RAJ": (str(df_ephem['RAJ1'][i])+':'+ str(df_ephem['RAJ2'][i])+':'+str(df_ephem['RAJ3'][i])),
+                "DECJ": (str(df_ephem['DECJ1'][i])+':'+ str(df_ephem['DECJ2'][i])+':'+str(df_ephem['DECJ3'][i])),
+                "START": (Time(df_ephem['START'][i], format="mjd", scale="tdb")),
+                "FINISH": (Time(df_ephem['FINISH'][i], format="mjd", scale="tdb")),
+                "EPHEM":(df_ephem['EPHEM'][i]),
+       	        'PEPOCH':(Time(int(df_ephem['t0geo'][i]), format="mjd", scale="tdb")),
+                "F0": (df_ephem['F0'][i]*u.Hz),
+                "F1": (f1*u.Hz/u.s),
+                "F2":(f2*u.Hz/(u.s**2)),
+                "TZRMJD":(Time(df_ephem['t0geo'][i], format="mjd", scale="tdb")),
+                "TZRFRQ":(0.0*u.Hz),
+                "TZRSITE":('coe'),
+                }
+
+	
+        #Create the model using PINT
+        for name_par, value in param_dic.items():
+                p = getattr(time_model, name_par)
+                p.quantity = value
+                
+        time_model.validate()
+  
+        print(time_model)
+
+        #Create the .par file
+        parname="model.par"
+        f=open(parname,"w+")
+        f.write(time_model.as_parfile())
+        f.close()
+
+        #Upload TOAs and model
+        m=models.get_model(parname)
+
+        #Calculate the phases
+        print('Calculating barycentric time and absolute phase')
+        barycent_toas=m.get_barycentric_toas(t)
+        phase_tuple=m.phase(t,abs_phase=True)
+        phases=np.concatenate([phases,phase_tuple.frac])
+
+	#Remove the tim and par files
+        os.remove(str(os.getcwd())+'/'+timname)
+        os.remove(str(os.getcwd())+'/'+parname)
+
+    
+    #Shift phases
+    for i in range(0,len(phases)):
+        if phases[i]<0:
+             phases[i]=phases[i]+1
+
+
+    #Statistics
+    limitP1=[0.026,0.983]
+    limitP2=[0.377,0.422]
+    limitOFF=[0.52,0.87]
+
+    P1_counts=len(phases[(phases<limitP1[0]) | (phases>limitP1[1])])
+    P2_counts=len(phases[(phases>limitP2[0]) & (phases<limitP2[1])])    
+    OFF_counts=len(phases[(phases>limitOFF[0]) & (phases<limitOFF[1])])
+
+    deltaP1=1+limitP1[0]-limitP1[1]
+    deltaP2=limitP2[1]-limitP2[0]
+    deltaOFF=limitOFF[1]-limitOFF[0]
+
+    alpha=deltaP1/deltaOFF
+    S1=np.sqrt(2)*(P1_counts*np.log((1+alpha)/alpha*(P1_counts/(P1_counts+OFF_counts)))+OFF_counts*np.log((1+alpha)*(OFF_counts/(P1_counts+OFF_counts))))**(1/2)
+    alpha=deltaP2/deltaOFF
+    S2=np.sqrt(2)*(P2_counts*np.log((1+alpha)/alpha*(P2_counts/(P2_counts+OFF_counts)))+OFF_counts*np.log((1+alpha)*(OFF_counts/(P2_counts+OFF_counts))))**(1/2)
+
+
+    #Histogram of phases
+    lc = np.histogram(phases, np.linspace(0,1,21))    
+    pcentres=(lc[1][1:]+lc[1][:-1])/2
+   
     # Create the pulsar phase plot
-    #fig, ax = plt.subplots(figsize=(12, 9))
-    #plt.tight_layout()
+    fig, ax = plt.subplots(figsize=(12, 9))
+    plt.bar(pcentres,lc[0],width=1/len(lc[0]),color='blue',alpha=0.5,edgecolor = 'black',linewidth=2)
+    plt.bar(pcentres+np.ones(len(pcentres)),lc[0],width=1/len(lc[0]),color='blue',alpha=0.5,edgecolor ='black',linewidth=2)
+        
+    #Plot errorbars
+    plt.errorbar(pcentres,lc[0],yerr=np.sqrt(lc[0]),color='black',fmt='.')
+    plt.errorbar(pcentres+np.ones(len(pcentres)),lc[0],yerr=np.sqrt(lc[0]),color='black',fmt='.')
+    
+
+    plt.fill_between(np.linspace(0,limitP1[0],150), 0, 1600500,facecolor='orange',color='orange',alpha=0.2)
+    plt.fill_between(np.linspace(limitP1[1],1+limitP1[0],150), 0, 1600500,facecolor='orange',color='orange',alpha=0.2)
+    plt.fill_between(np.linspace(1+limitP1[1],2,150), 0, 1600500,facecolor='orange',color='orange',alpha=0.2)
+
+    plt.fill_between(np.linspace(limitP2[0],limitP2[1],150), 0, 1600500,facecolor='green',color='green',alpha=0.2)    
+    plt.fill_between(np.linspace(limitP2[0]+1,limitP2[1]+1,150), 0, 1600500,facecolor='green',color='green',alpha=0.2)
+
+    #Add labels
+    plt.xlabel('Pulsar phase')
+    plt.ylabel('Events')
+    text_towrite=f'P1:Sig(Li&Ma):{S1:.2f}$\sigma$'+'\n'+f'P2:Sig(Li&Ma):{S2:.2f}$\sigma$'
+    #Set limits in axis
+    plt.ylim(max(min(lc[0])-3*np.sqrt(min(lc[0])),0),max(lc[0])+2*np.sqrt(max(lc[0])))
+    plt.annotate(text_towrite, xy=(0.7, 0.9), xytext=(0.7,0.9), fontsize=15,xycoords='axes fraction', textcoords='offset points', color='tab:red',bbox=dict(facecolor='white', edgecolor='tab:red'),horizontalalignment='left', verticalalignment='top')
+        
+    plt.tight_layout()
     # Save plot
-    #plt.savefig(f"{args.output_dir}/pulsar_{args.name}.pdf", dpi=600)
+    plt.savefig(f"{args.output_dir}/pulsar_{args.name}.pdf", dpi=600)
     # Show plot
-    #plt.show()
+    plt.show()
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
