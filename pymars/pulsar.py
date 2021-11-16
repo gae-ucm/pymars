@@ -387,7 +387,7 @@ def main():
     text_towrite=f'number:{len(phases)}:'+'\n' +f'P1:Sig(Li&Ma):{S1:.2f}$\sigma$'+'\n'+f'P2:Sig(Li&Ma):{S2:.2f}$\sigma$'
     #Set limits in axis
     plt.ylim(max(min(lc[0])-3*np.sqrt(min(lc[0])),0),max(lc[0])+2*np.sqrt(max(lc[0])))
-    plt.annotate(text_towrite, xy=(0.7, 0.9), xytext=(0.7,0.9), fontsize=15,xycoords='axes fraction', textcoords='offset points', color='tab:red',bbox=dict(facecolor='white', edgecolor='tab:red'),horizontalalignment='left', verticalalignment='top')
+    plt.annotate(text_towrite, xy=(0.7, 0.9), xytext=(0.7,0.9), fontsize=15,xycoords='axes fraction', textcoords='offset points', color='black',bbox=dict(facecolor='white', edgecolor='black'),horizontalalignment='left', verticalalignment='top')
         
     plt.tight_layout()
     # Save plot
