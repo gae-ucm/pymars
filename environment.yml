@@ -18,3 +18,4 @@ dependencies:
     - pytables
     - pip:
         - ctaplot >= 0.5.6
+        - pint-pulsar
