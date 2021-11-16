@@ -54,7 +54,7 @@ def main():
     parser.add_argument('--input_dir', '-i',
                         help='input directory',
                         default="./")
-    parser.add_argument('--pattern', '-p',
+    parser.add_argument('--pattern', '-q',
                         help='pattern to mask unwanted files',
                         default="*.h5")
     parser.add_argument('--output_dir', '-o',
@@ -86,6 +86,17 @@ def main():
                         type=int)
     parser.add_argument('--ephemeris', '-e',
                         help='ephemeris file; txt format')
+    parser.add_argument('--phases', '-p',
+                        help='phases file; pandas hdf format')
+    parser.add_argument('--p1', '-a',
+                        help='p1 phase limits',
+                        nargs='+')
+    parser.add_argument('--p2', '-c',
+                        help='p2 phase limits',
+                        nargs='+')
+    parser.add_argument('--bkg', '-g',
+                        help='p2 phase limits',
+                        nargs='+')
     parser.add_argument('--times', '-t',
                         help='quate excluded time file; ascii format ".times"')
     args = parser.parse_args()
@@ -111,54 +122,168 @@ def main():
     files = np.sort(glob.glob(os.path.join(abs_file_dir, args.pattern)))
     filename_type = files[0].split('.')[-1]
 
-    phases = np.array([])
+    
+    phases_list=[]
     for i, file in enumerate(files):
         print(file)
         if filename_type == "h5":
-            data = pd.HDFStore(file, 'r')
-            reco_energy = np.array(data['data']['reco_energy']) * u.TeV
-            mc_alt = np.array(data['data']['mc_alt']) * u.rad
-            reco_alt = np.array(data['data']['reco_alt']) * u.rad
-            mc_az = np.array(data['data']['mc_az']) * u.rad
-            reco_az = np.array(data['data']['reco_az']) * u.rad
-            pointing_alt = np.array(data['data']['pointing_alt']) * u.rad
-            pointing_az = np.array(data['data']['pointing_az']) * u.rad
+                data = pd.HDFStore(file, 'r')
+                reco_energy = np.array(data['data']['reco_energy']) * u.TeV
+                mc_alt = np.array(data['data']['mc_alt']) * u.rad
+                reco_alt = np.array(data['data']['reco_alt']) * u.rad
+                mc_az = np.array(data['data']['mc_az']) * u.rad
+                reco_az = np.array(data['data']['reco_az']) * u.rad
+                pointing_alt = np.array(data['data']['pointing_alt']) * u.rad
+                pointing_az = np.array(data['data']['pointing_az']) * u.rad
 
-            mjd = np.array(data['data']['mjd'])
-            millisec = np.array(data['data']['millisec'])
-            nanosec = np.array(data['data']['nanosec'])
+                mjd = np.array(data['data']['mjd'])
+                millisec = np.array(data['data']['millisec'])
+                nanosec = np.array(data['data']['nanosec'])
 
-            hadronness = np.array(data['data']['hadronness'])
-            size_m1 =  np.array(data['data']['M1_hillas_intensity'])
-            size_m2 =  np.array(data['data']['M2_hillas_intensity'])
-            leakage1_m1 = np.array(data['data']['M1_leakage_intensity_1'])
-            leakage1_m2 = np.array(data['data']['M2_leakage_intensity_1'])
+                hadronness = np.array(data['data']['hadronness'])
+                size_m1 =  np.array(data['data']['M1_hillas_intensity'])
+                size_m2 =  np.array(data['data']['M2_hillas_intensity'])
+                leakage1_m1 = np.array(data['data']['M1_leakage_intensity_1'])
+                leakage1_m2 = np.array(data['data']['M2_leakage_intensity_1'])
 
         elif filename_type == "root":
-            melibea_file = uproot.open(file)
-            evts = melibea_file["Events"]
-            reco_alt = np.asarray(evts["MStereoParDisp.fDirectionY"].array()) +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())
-            marsDefaultMask = ~np.isnan(reco_alt)
-            reco_alt = reco_alt[marsDefaultMask]
-            reco_az = np.asarray(evts["MStereoParDisp.fDirectionX"].array())[marsDefaultMask] +  np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask]
-            reco_alt *= u.deg
-            reco_az *= u.deg
-            mc_alt =  (np.asarray(evts["MSrcPosCam_1.fY"].array())[marsDefaultMask] * 0.00337 +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())[marsDefaultMask]) * u.deg
-            mc_az =  (np.asarray(evts["MSrcPosCam_1.fX"].array())[marsDefaultMask] * 0.00337 +  np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask]) * u.deg
-            pointing_alt = (90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())[marsDefaultMask]) * u.deg
-            pointing_az = np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask] * u.deg
-            reco_energy = np.asarray(evts["MEnergyEst.fEnergy"].array())[marsDefaultMask] * u.GeV
+                melibea_file = uproot.open(file)
+                evts = melibea_file["Events"]
+                reco_alt = np.asarray(evts["MStereoParDisp.fDirectionY"].array()) +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())
+                marsDefaultMask = ~np.isnan(reco_alt)
+                reco_alt = reco_alt[marsDefaultMask]
+                reco_az = np.asarray(evts["MStereoParDisp.fDirectionX"].array())[marsDefaultMask] +  np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask]
+                reco_alt *= u.deg
+                reco_az *= u.deg
+                mc_alt =  (np.asarray(evts["MSrcPosCam_1.fY"].array())[marsDefaultMask] * 0.00337 +  90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())[marsDefaultMask]) * u.deg
+                mc_az =  (np.asarray(evts["MSrcPosCam_1.fX"].array())[marsDefaultMask] * 0.00337 +  np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask]) * u.deg
+                pointing_alt = (90.0 - np.asarray(evts["MPointingPos_1.fZd"].array())[marsDefaultMask]) * u.deg
+                pointing_az = np.asarray(evts["MPointingPos_1.fAz"].array())[marsDefaultMask] * u.deg
+                reco_energy = np.asarray(evts["MEnergyEst.fEnergy"].array())[marsDefaultMask] * u.GeV
 
-            mjd = np.asarray(evts["MTime_1.fMjd"].array())[marsDefaultMask]
-            millisec = np.asarray(evts["MTime_1.fTime.fMilliSec"].array())[marsDefaultMask]/1000.0/3600.0/24.0
-            nanosec = np.asarray(evts["MTime_1.fNanoSec"].array())[marsDefaultMask]/1e9/3600.0/24.0
-            print(np.asarray(evts["MTime_1.fTime.fMilliSec"].array())[marsDefaultMask])
-            hadronness = np.asarray(evts["MHadronness.fHadronness"].array())[marsDefaultMask]
-            size_m1 = np.asarray(evts["MHillas_1.fSize"].array())[marsDefaultMask]
-            size_m2 = np.asarray(evts["MHillas_2.fSize"].array())[marsDefaultMask]
-            leakage1_m1 = np.asarray(evts["MNewImagePar_1.fLeakage1"].array())[marsDefaultMask]
-            leakage1_m2 = np.asarray(evts["MNewImagePar_2.fLeakage1"].array())[marsDefaultMask]
+                mjd = np.asarray(evts["MTime_1.fMjd"].array())[marsDefaultMask]
+                millisec = np.asarray(evts["MTime_1.fTime.fMilliSec"].array())[marsDefaultMask]/1000.0/3600.0/24.0
+                nanosec = np.asarray(evts["MTime_1.fNanoSec"].array())[marsDefaultMask]/1e9/3600.0/24.0
+                print(np.asarray(evts["MTime_1.fTime.fMilliSec"].array())[marsDefaultMask])
+                hadronness = np.asarray(evts["MHadronness.fHadronness"].array())[marsDefaultMask]
+                size_m1 = np.asarray(evts["MHillas_1.fSize"].array())[marsDefaultMask]
+                size_m2 = np.asarray(evts["MHillas_2.fSize"].array())[marsDefaultMask]
+                leakage1_m1 = np.asarray(evts["MNewImagePar_1.fLeakage1"].array())[marsDefaultMask]
+                leakage1_m2 = np.asarray(evts["MNewImagePar_2.fLeakage1"].array())[marsDefaultMask]
+    
+        if args.phases:
+            phases_list=[]
+        else:       
+            #CALCULATION OF PHASES
+            timestamp = np.float128(mjd+millisec+nanosec) 
 
+            # Write the .tim file to use with PINT
+            timname='times.tim'
+            timFile=open(timname,'w+')
+            timFile.write('FORMAT 1 \n')
+            for i in range(0,len(timestamp)):
+                    timFile.write('magic '+'0.0 '+str(timestamp[i])+' 0.0 '+ 'magic'+' \n')
+            timFile.close()
+
+            #Upload the TOAs object
+            t= pint.toa.get_TOAs(timname)
+
+            #Create model from ephemeris
+            #Read the ephemeris txt file
+            colnames=['PSR', 'RAJ1','RAJ2','RAJ3', 'DECJ1','DECJ2','DECJ3', 'START', 'FINISH', 't0geo', 'F0', 'F1', 'F2','RMS','Observatory', 'EPHEM', 'PSR2']
+            df_ephem = pd.read_csv(os.path.abspath(args.ephemeris), delimiter='\s+',names=colnames,header=None)
+
+            #Search the line of the ephemeris at which the interval time of arrivals given belongs
+            for i in range(0,len(df_ephem['START'])):
+                    if (timestamp[0]>df_ephem['START'][i]) & (timestamp[0]<df_ephem['FINISH'][i]):
+                            break
+                    elif (timestamp[0]< df_ephem['START'][i]) & (i==0):
+                            print('No ephemeris available')
+                    elif (timestamp[0]> df_ephem['START'][i]) & (timestamp[0]> df_ephem['FINISH'][i])& (i==len(df_ephem['START'])):
+                            print('No ephemeris available')
+
+            # Select the components(see PINT pulsar documentation)
+            components=[]
+            for name in ["AbsPhase","AstrometryEquatorial", "Spindown","SolarSystemShapiro"]:
+                    component_object = models.timing_model.Component.component_types[name]  
+                    components.append(component_object())
+            time_model = models.timing_model.TimingModel(components=components)
+
+            #Add second derivative of the frequency
+            f2 = models.parameter.prefixParameter(
+                    parameter_type="float",
+                    name="F2",
+                    value=0.0,
+                    units=u.Hz / (u.s) ** 2,
+                    longdouble=True,
+            )
+            time_model.components["Spindown"].add_param(f2, setup=True)
+
+            #Add START and FINISH parameters
+            time_model.add_param_from_top(models.parameter.MJDParameter(name="START", description="Start MJD for fitting"), "")
+            time_model.add_param_from_top(models.parameter.MJDParameter(name="FINISH", description="End MJD for fitting"), "")
+
+            #Adopt format of f1 and f2 from PINT        
+            f1=float(str(df_ephem['F1'][i].replace('D','E')))
+            f2=float(str(df_ephem['F2'][i].replace('D','E')))
+
+            #Create a dictionary with the values of the parameters
+            param_dic = {
+                    "PSR":(df_ephem['PSR'][i]) ,
+                    "RAJ": (str(df_ephem['RAJ1'][i])+':'+ str(df_ephem['RAJ2'][i])+':'+str(df_ephem['RAJ3'][i])),
+                    "DECJ": (str(df_ephem['DECJ1'][i])+':'+ str(df_ephem['DECJ2'][i])+':'+str(df_ephem['DECJ3'][i])),
+                    "START": (Time(df_ephem['START'][i], format="mjd", scale="tdb")),
+                    "FINISH": (Time(df_ephem['FINISH'][i], format="mjd", scale="tdb")),
+                    "EPHEM":(df_ephem['EPHEM'][i]),
+                    'PEPOCH':(Time(int(df_ephem['t0geo'][i]), format="mjd", scale="tdb")),
+                    "F0": (df_ephem['F0'][i]*u.Hz),
+                    "F1": (f1*u.Hz/u.s),
+                    "F2":(f2*u.Hz/(u.s**2)),
+                    "TZRMJD":(Time(df_ephem['t0geo'][i], format="mjd", scale="tdb")),
+                    "TZRFRQ":(0.0*u.Hz),
+                    "TZRSITE":('coe'),
+                    }
+
+            #Create the model using PINT
+            for name_par, value in param_dic.items():
+                    p = getattr(time_model, name_par)
+                    p.quantity = value
+            time_model.validate()
+
+            #Create the .par file
+            parname="model.par"
+            f=open(parname,"w+")
+            f.write(time_model.as_parfile())
+            f.close()
+
+            #Upload TOAs and model
+            m=models.get_model(parname)
+
+            #Calculate the phases
+            print('Calculating barycentric time and absolute phase')
+            barycent_toas=m.get_barycentric_toas(t)
+            phase_tuple=m.phase(t,abs_phase=True)
+            phases_file=phase_tuple.frac
+
+            #Remove the tim and par files
+            os.remove(str(os.getcwd())+'/'+timname)
+            os.remove(str(os.getcwd())+'/'+parname)
+
+            #Shift phases
+            for i in range(0,len(phases_file)):
+                if phases_file[i]<0:
+                    phases_file[i]=phases_file[i]+1   
+            
+            # From here you have the time_stamps of the events in the ON region: 
+            filename=file.split("/")[-1].replace('.'+filename_type, "")
+            print('Writing in'+ abs_file_dir+'/'+filename+'_phases.txt')
+            file=open(abs_file_dir+'/'+filename+'_phases.txt',"w+")
+            writer = csv.writer(file)
+            for phase in phases_file:
+                writer.writerow([phase.value])     
+            file.close()
+            print('Finished writing')
+        
         hadronnessMask = (hadronness < args.hadronnessCut)
         reco_energy = reco_energy[hadronnessMask]
         mc_alt = mc_alt[hadronnessMask]
@@ -167,10 +292,7 @@ def main():
         reco_az = reco_az[hadronnessMask]
         pointing_alt = pointing_alt[hadronnessMask]
         pointing_az = pointing_az[hadronnessMask]
-
-        mjd = mjd[hadronnessMask]
-        millisec = millisec[hadronnessMask]
-        nanosec = nanosec[hadronnessMask]
+        phases_file=phases_file[hadronnessMask]
 
         size_m1 = size_m1[hadronnessMask]
         size_m2 = size_m2[hadronnessMask]
@@ -188,9 +310,7 @@ def main():
             pointing_alt = pointing_alt[sizeMask]
             pointing_az = pointing_az[sizeMask]
 
-            mjd = mjd[sizeMask]
-            millisec = millisec[sizeMask]
-            nanosec = nanosec[sizeMask]
+            phases_file=phases_file[sizeMask]
 
             leakage1_m1 = leakage1_m1[sizeMask]
             leakage1_m2 = leakage1_m2[sizeMask]
@@ -205,9 +325,7 @@ def main():
             pointing_alt = pointing_alt[energyMask]
             pointing_az = pointing_az[energyMask]
 
-            mjd = mjd[energyMask]
-            millisec = millisec[energyMask]
-            nanosec = nanosec[energyMask]
+            phases_file=phases_file[energyMask]
 
         # ON region
         theta2_on = (mc_alt-reco_alt).to(u.deg)**2 + (mc_az-reco_az).to(u.deg)**2
@@ -216,127 +334,17 @@ def main():
 
         # Get the events in the ON region 
         on_region = theta2_on.value < args.signalCut
-
-        mjd = mjd[on_region]
-        millisec = millisec[on_region]
-        nanosec = nanosec[on_region]
-        timestamp = np.float128(mjd+millisec+nanosec) 
- 
-        # From here you have the time_stamps of the events in the ON region:        
-	
-	# Write the .tim file to use with PINT
-        timname='times.tim'
-        timFile=open(timname,'w+')
-        timFile.write('FORMAT 1 \n')
-        for i in range(0,len(timestamp)):
-                timFile.write('magic '+'0.0 '+str(timestamp[i])+' 0.0 '+ 'magic'+' \n')
-        timFile.close()
-
-        #Upload the TOAs object
-        t= pint.toa.get_TOAs(timname)
+        phases_file=phases_file[on_region]
+        phases_list.append(phases_file)
     
-        #Create model from ephemeris
-        #Read the ephemeris txt file
-        colnames=['PSR', 'RAJ1','RAJ2','RAJ3', 'DECJ1','DECJ2','DECJ3', 'START', 'FINISH', 't0geo', 'F0', 'F1', 'F2',
-              'RMS','Observatory', 'EPHEM', 'PSR2']
-        df_ephem = pd.read_csv(os.path.abspath(args.ephemeris), delimiter='\s+',names=colnames,header=None)
-
-        #Search the line of the ephemeris at which the interval time of arrivals given belongs
-        for i in range(0,len(df_ephem['START'])):
-                if (timestamp[0]>df_ephem['START'][i]) & (timestamp[0]<df_ephem['FINISH'][i]):
-                        break		
-                elif (timestamp[0]< df_ephem['START'][i]) & (i==0):
-                        print('No ephemeris available')
-                elif (timestamp[0]> df_ephem['START'][i]) & (timestamp[0]> df_ephem['FINISH'][i])& (i==len(df_ephem['START'])):
-                        print('No ephemeris available')
-
-       
-
-        # Select the components(see PINT pulsar documentation)
-        components=[]
-        for name in ["AbsPhase","AstrometryEquatorial", "Spindown","SolarSystemShapiro"]:
-                component_object = models.timing_model.Component.component_types[name]  
-                components.append(component_object())
-
-        time_model = models.timing_model.TimingModel(components=components)
-
-
-        #Add second derivative of the frequency
-        f2 = models.parameter.prefixParameter(
-                parameter_type="float",
-                name="F2",
-                value=0.0,
-                units=u.Hz / (u.s) ** 2,
-                longdouble=True,
-        )	
-        time_model.components["Spindown"].add_param(f2, setup=True)
-
-
-        #Add START and FINISH parameters
-        time_model.add_param_from_top(models.parameter.MJDParameter(name="START", description="Start MJD for fitting"), "")
-        time_model.add_param_from_top(models.parameter.MJDParameter(name="FINISH", description="End MJD for fitting"), "")
+    ############
     
-	#Adopt format of f1 and f2 from PINT        
-        f1=float(str(df_ephem['F1'][i].replace('D','E')))
-        f2=float(str(df_ephem['F2'][i].replace('D','E')))
-    
-        #Create a dictionary with the values of the parameters
-        param_dic = {
-                "PSR":(df_ephem['PSR'][i]) ,
-                "RAJ": (str(df_ephem['RAJ1'][i])+':'+ str(df_ephem['RAJ2'][i])+':'+str(df_ephem['RAJ3'][i])),
-                "DECJ": (str(df_ephem['DECJ1'][i])+':'+ str(df_ephem['DECJ2'][i])+':'+str(df_ephem['DECJ3'][i])),
-                "START": (Time(df_ephem['START'][i], format="mjd", scale="tdb")),
-                "FINISH": (Time(df_ephem['FINISH'][i], format="mjd", scale="tdb")),
-                "EPHEM":(df_ephem['EPHEM'][i]),
-       	        'PEPOCH':(Time(int(df_ephem['t0geo'][i]), format="mjd", scale="tdb")),
-                "F0": (df_ephem['F0'][i]*u.Hz),
-                "F1": (f1*u.Hz/u.s),
-                "F2":(f2*u.Hz/(u.s**2)),
-                "TZRMJD":(Time(df_ephem['t0geo'][i], format="mjd", scale="tdb")),
-                "TZRFRQ":(0.0*u.Hz),
-                "TZRSITE":('coe'),
-                }
-
-	
-        #Create the model using PINT
-        for name_par, value in param_dic.items():
-                p = getattr(time_model, name_par)
-                p.quantity = value
-                
-        time_model.validate()
+    phases=np.concatenate(phases_list)
   
-        print(time_model)
-
-        #Create the .par file
-        parname="model.par"
-        f=open(parname,"w+")
-        f.write(time_model.as_parfile())
-        f.close()
-
-        #Upload TOAs and model
-        m=models.get_model(parname)
-
-        #Calculate the phases
-        print('Calculating barycentric time and absolute phase')
-        barycent_toas=m.get_barycentric_toas(t)
-        phase_tuple=m.phase(t,abs_phase=True)
-        phases=np.concatenate([phases,phase_tuple.frac])
-
-	#Remove the tim and par files
-        os.remove(str(os.getcwd())+'/'+timname)
-        os.remove(str(os.getcwd())+'/'+parname)
-
-    
-    #Shift phases
-    for i in range(0,len(phases)):
-        if phases[i]<0:
-             phases[i]=phases[i]+1
-
-
     #Statistics
-    limitP1=[0.026,0.983]
-    limitP2=[0.377,0.422]
-    limitOFF=[0.52,0.87]
+    limitP1=args.p1
+    limitP2=args.p2
+    limitOFF=args.bkg
 
     P1_counts=len(phases[(phases<limitP1[0]) | (phases>limitP1[1])])
     P2_counts=len(phases[(phases>limitP2[0]) & (phases<limitP2[1])])    
@@ -376,7 +384,7 @@ def main():
     #Add labels
     plt.xlabel('Pulsar phase')
     plt.ylabel('Events')
-    text_towrite=f'P1:Sig(Li&Ma):{S1:.2f}$\sigma$'+'\n'+f'P2:Sig(Li&Ma):{S2:.2f}$\sigma$'
+    text_towrite=f'number:{len(phases)}:'+'\n' +f'P1:Sig(Li&Ma):{S1:.2f}$\sigma$'+'\n'+f'P2:Sig(Li&Ma):{S2:.2f}$\sigma$'
     #Set limits in axis
     plt.ylim(max(min(lc[0])-3*np.sqrt(min(lc[0])),0),max(lc[0])+2*np.sqrt(max(lc[0])))
     plt.annotate(text_towrite, xy=(0.7, 0.9), xytext=(0.7,0.9), fontsize=15,xycoords='axes fraction', textcoords='offset points', color='tab:red',bbox=dict(facecolor='white', edgecolor='tab:red'),horizontalalignment='left', verticalalignment='top')
